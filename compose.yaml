@@ -1,7 +1,5 @@
-# Adminer uses the host network so "localhost" in the DB login form
-# reaches your machine (and other containers' published ports).
 # Access Adminer at http://localhost:8080
-# Windows: enable "Enable host networking" in Docker Desktop → Settings → Resources → Network
+# Use host.docker.internal in the Adminer login form to reach services running on your machine.
 services:
   adminer:
     build:
@@ -10,6 +8,7 @@ services:
     image: adminer-saved-connections:local
     container_name: adminer
     restart: no
-    network_mode: host
+    ports:
+      - "8080:8080"
     volumes:
       - ./data:/var/lib/adminer
