@@ -1,0 +1,131 @@
+.saved-connections-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 16px;
+}
+.saved-connections-modal[hidden] {
+    display: none;
+}
+.saved-connections-modal__dialog {
+    width: min(28em, 100%);
+    border: 1px solid #999;
+    background: var(--bg);
+    color: var(--fg);
+    padding: 0 1em 1em;
+    box-shadow: 0 0 20px -3px var(--fg);
+    font: 90% / 1.25 Verdana, Arial, Helvetica, sans-serif;
+}
+.saved-connections-modal__title {
+    margin: 0 -.667em .8em;
+    padding: .8em .667em;
+    border-bottom: 1px solid #999;
+    font-size: 150%;
+    font-weight: normal;
+    color: #777;
+    background: var(--dim);
+}
+.saved-connections-modal__description {
+    margin: 0 0 .8em;
+    color: var(--fg);
+    font-size: 100%;
+    line-height: 1.25;
+}
+.saved-connections-modal__field {
+    margin-bottom: .8em;
+}
+.saved-connections-modal__field label {
+    display: block;
+    margin-bottom: .2em;
+    font-weight: normal;
+}
+.saved-connections-modal__field input {
+    width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+}
+.saved-connections-modal__pin {
+    display: flex;
+    gap: .5em;
+}
+.saved-connections-modal__pin-slot {
+    width: 3em;
+    height: auto;
+    border: 1px solid #999;
+    border-radius: 0;
+    background: var(--bg);
+    color: var(--fg);
+    text-align: center;
+    line-height: 1.25;
+    padding: .2em .3em;
+}
+.saved-connections-modal__pin-slot:focus {
+    outline: 2px solid var(--fg);
+    outline-offset: 2px;
+}
+.saved-connections-modal__actions {
+    margin-top: .8em;
+    text-align: right;
+}
+.saved-connections-modal__submit {
+    border: 1px solid #999;
+    background: var(--dim);
+    color: var(--fg);
+    cursor: pointer;
+    padding: .2em .6em;
+    font: inherit;
+}
+.saved-connections-modal__submit:hover {
+    background: var(--lit);
+}
+.saved-connections-modal__error {
+    color: red;
+    background: #fee;
+    font-size: 100%;
+    line-height: 1.25;
+    padding: .5em .8em;
+    margin: .8em 0 0;
+}
+.saved-connections-modal__error:empty {
+    display: none;
+}
+.saved-connections-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    background: #17324d;
+    color: #fff;
+    padding: 10px 14px;
+    border-radius: 999px;
+    z-index: 2100;
+    box-shadow: 0 10px 28px rgba(10, 20, 30, 0.25);
+}
+@media (max-width: 640px) {
+    .saved-connections-card__item,
+    .saved-connections-bookmarks__item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .saved-connections-card__actions {
+        justify-content: flex-end;
+    }
+    .saved-connections-floating {
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+    }
+    .saved-connections-bookmarks {
+        left: 16px;
+        right: 16px;
+        width: auto;
+        bottom: 66px;
+    }
+    .saved-connections-modal__pin-slot {
+        width: calc((100% - 1.5em) / 4);
+    }
+}
