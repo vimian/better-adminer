@@ -1,0 +1,9 @@
+data/*
+!data/.gitkeep
+
+.env
+.env.*
+!.env.example
+
+*.local
+docker-compose.override.yml
