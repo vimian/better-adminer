@@ -34,11 +34,32 @@ class SavedConnectionsPlugin extends Adminer\Plugin
                 $this->sendJson(array('connection' => $record));
             }
 
+            if ($action === 'save_bookmark') {
+                $this->requireMethod('POST');
+                $payload = $this->readJsonBody();
+                $record = $this->saveBookmark($payload);
+                $this->sendJson(array('connection' => $record));
+            }
+
             if ($action === 'delete') {
                 $this->requireMethod('POST');
                 $payload = $this->readJsonBody();
                 $this->deleteConnection($payload);
                 $this->sendJson(array('connections' => $this->listConnections()));
+            }
+
+            if ($action === 'delete_bookmark') {
+                $this->requireMethod('POST');
+                $payload = $this->readJsonBody();
+                $record = $this->deleteBookmark($payload);
+                $this->sendJson(array('connection' => $record));
+            }
+
+            if ($action === 'link_connection') {
+                $this->requireMethod('POST');
+                $payload = $this->readJsonBody();
+                $record = $this->linkConnection($payload);
+                $this->sendJson(array('connection' => $record));
             }
 
             if ($action === 'current') {
@@ -69,15 +90,18 @@ class SavedConnectionsPlugin extends Adminer\Plugin
 }
 .saved-connections-card__empty,
 .saved-connections-card__meta,
-.saved-connections-modal__hint {
+.saved-connections-modal__hint,
+.saved-connections-bookmarks__subtitle {
     color: #777;
     font-size: 12px;
     line-height: 1.4;
 }
-.saved-connections-card__list {
+.saved-connections-card__list,
+.saved-connections-bookmarks__list {
     margin: 0;
 }
 .saved-connections-card__item,
+.saved-connections-bookmarks__item,
 .saved-connections-card__empty {
     display: flex;
     align-items: flex-start;
@@ -90,7 +114,8 @@ class SavedConnectionsPlugin extends Adminer\Plugin
 .saved-connections-card__empty {
     display: block;
 }
-.saved-connections-card__open {
+.saved-connections-card__open,
+.saved-connections-bookmarks__open {
     display: block;
     width: 100%;
     text-align: left;
@@ -102,20 +127,26 @@ class SavedConnectionsPlugin extends Adminer\Plugin
     font: inherit;
 }
 .saved-connections-card__open:hover,
-.saved-connections-card__forget:hover {
+.saved-connections-card__forget:hover,
+.saved-connections-bookmarks__open:hover,
+.saved-connections-bookmarks__forget:hover {
     opacity: .7;
 }
 .saved-connections-card__actions {
     display: flex;
     align-items: center;
 }
-.saved-connections-card__forget {
+.saved-connections-card__forget,
+.saved-connections-bookmarks__forget {
     padding: 0;
     border: 0;
     background: none;
     color: var(--fg);
     cursor: pointer;
     font: inherit;
+}
+.saved-connections-card__title {
+    display: block;
 }
 .saved-connections-launcher {
     font: 90% / 1.25 Verdana, Arial, Helvetica, sans-serif;
@@ -126,6 +157,65 @@ class SavedConnectionsPlugin extends Adminer\Plugin
     bottom: 24px;
     z-index: 1000;
     box-shadow: 0 8px 24px rgba(20, 40, 60, 0.15);
+}
+.saved-connections-bookmarks {
+    position: fixed;
+    right: 24px;
+    bottom: 78px;
+    z-index: 990;
+    width: min(26em, calc(100vw - 48px));
+    max-height: min(55vh, 32em);
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid #ccc;
+    background: var(--bg);
+    box-shadow: 0 8px 24px rgba(20, 40, 60, 0.15);
+}
+.saved-connections-bookmarks[hidden] {
+    display: none;
+}
+.saved-connections-bookmarks__header {
+    padding: .7em 1em;
+    border-bottom: 1px solid #ccc;
+    background: var(--dim);
+}
+.saved-connections-bookmarks__title {
+    margin: 0;
+    font-size: 13px;
+    color: var(--fg);
+}
+.saved-connections-bookmarks__subtitle {
+    display: none;
+}
+.saved-connections-bookmarks__item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "content content"
+        "meta actions";
+    align-items: end;
+}
+.saved-connections-bookmarks__open {
+    grid-area: content;
+    min-width: 0;
+}
+.saved-connections-bookmarks__label {
+    display: block;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.saved-connections-bookmarks__meta {
+    grid-area: meta;
+    padding-top: .5em;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+.saved-connections-bookmarks__actions {
+    grid-area: actions;
+    justify-self: end;
+    align-self: end;
+    padding-top: .5em;
 }
 .saved-connections-modal {
     position: fixed;
@@ -235,7 +325,8 @@ class SavedConnectionsPlugin extends Adminer\Plugin
     box-shadow: 0 10px 28px rgba(10, 20, 30, 0.25);
 }
 @media (max-width: 640px) {
-    .saved-connections-card__item {
+    .saved-connections-card__item,
+    .saved-connections-bookmarks__item {
         flex-direction: column;
         align-items: stretch;
     }
@@ -247,6 +338,12 @@ class SavedConnectionsPlugin extends Adminer\Plugin
         right: 16px;
         bottom: 16px;
     }
+    .saved-connections-bookmarks {
+        left: 16px;
+        right: 16px;
+        width: auto;
+        bottom: 66px;
+    }
     .saved-connections-modal__pin-slot {
         width: calc((100% - 1.5em) / 4);
     }
@@ -254,18 +351,9 @@ class SavedConnectionsPlugin extends Adminer\Plugin
 </style>
 HTML;
 
-        $basePath = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH) ?: '/';
-        $currentEndpoint = $basePath;
-        if (defined('Adminer\\DRIVER') && defined('Adminer\\SERVER') && !empty($_GET['username'])) {
-            $query = array(
-                (string) constant('Adminer\\DRIVER') => (string) constant('Adminer\\SERVER'),
-                'username' => (string) $_GET['username'],
-            );
-            if (defined('Adminer\\DB') && constant('Adminer\\DB') !== '') {
-                $query['db'] = (string) constant('Adminer\\DB');
-            }
-            $currentEndpoint .= '?'.http_build_query($query);
-        }
+        $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
+        $basePath = parse_url($requestUri, PHP_URL_PATH) ?: '/';
+        $currentEndpoint = $requestUri !== '' ? $requestUri : $basePath;
 
         $config = array(
             'endpoint' => $basePath,
@@ -293,16 +381,29 @@ HTML;
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
     let cachedConnections = [];
+    let currentConnection = null;
+    let currentFingerprint = "";
+    let currentConnectionError = "";
     let toastTimer = null;
     let modalState = null;
 
     document.addEventListener("DOMContentLoaded", () => {
         injectSavedConnectionsPanel();
+        injectBookmarksPanel();
         injectCurrentConnectionButton();
-        if (getAuthForm()) {
-            void refreshConnections();
-        }
+        void initializePageState();
     });
+
+    async function initializePageState() {
+        if (!getAuthForm()) {
+            try {
+                await ensureCurrentConnection();
+            } catch (error) {
+                // renderBookmarks handles the failure state.
+            }
+        }
+        await refreshConnections();
+    }
 
     function endpointUrl(action, useCurrentContext = false) {
         const url = new URL(useCurrentContext ? config.currentEndpoint : config.endpoint, window.location.origin);
@@ -337,8 +438,10 @@ HTML;
             const data = await apiRequest("list");
             cachedConnections = Array.isArray(data.connections) ? data.connections : [];
             renderSavedConnections();
+            renderBookmarks();
         } catch (error) {
             renderSavedConnections(error.message);
+            renderBookmarks(error.message);
         }
     }
 
@@ -394,8 +497,8 @@ HTML;
             openButton.type = "button";
             openButton.className = "saved-connections-card__open";
             openButton.innerHTML =
-                `<strong>${escapeHtml(connection.label || "Saved connection")}</strong>` +
-                `<div class="saved-connections-card__meta">Updated ${formatDate(connection.updatedAt)}</div>`;
+                `<strong class="saved-connections-card__title">${escapeHtml(connection.label || "Saved connection")}</strong>` +
+                `<div class="saved-connections-card__meta">Updated ${formatDate(connection.updatedAt)} • ${formatCount(connection.bookmarks?.length || 0, "bookmark")}</div>`;
             openButton.addEventListener("click", () => unlockAndLogin(connection));
 
             const actions = document.createElement("div");
@@ -428,6 +531,141 @@ HTML;
         }
     }
 
+    function injectBookmarksPanel() {
+        if (getAuthForm() || document.querySelector("[data-saved-bookmarks-panel]")) {
+            return;
+        }
+
+        const panel = document.createElement("section");
+        panel.className = "saved-connections-card saved-connections-bookmarks";
+        panel.hidden = true;
+        panel.dataset.savedBookmarksPanel = "1";
+        panel.innerHTML = `
+            <div class="saved-connections-bookmarks__header">
+                <div class="saved-connections-bookmarks__title">Bookmarks</div>
+                <div class="saved-connections-bookmarks__subtitle" data-saved-bookmarks-subtitle></div>
+            </div>
+            <div class="saved-connections-bookmarks__list" data-saved-bookmarks-list></div>
+        `;
+        document.body.appendChild(panel);
+    }
+
+    function renderBookmarks(errorMessage = "") {
+        const panel = document.querySelector("[data-saved-bookmarks-panel]");
+        const subtitle = document.querySelector("[data-saved-bookmarks-subtitle]");
+        const list = document.querySelector("[data-saved-bookmarks-list]");
+        if (!panel || !subtitle || !list) {
+            return;
+        }
+
+        list.textContent = "";
+
+        if (errorMessage) {
+            panel.hidden = false;
+            subtitle.textContent = "";
+            const error = document.createElement("div");
+            error.className = "saved-connections-card__empty";
+            error.textContent = errorMessage;
+            list.appendChild(error);
+            return;
+        }
+
+        if (currentConnectionError) {
+            panel.hidden = false;
+            subtitle.textContent = "";
+            const error = document.createElement("div");
+            error.className = "saved-connections-card__empty";
+            error.textContent = currentConnectionError;
+            list.appendChild(error);
+            return;
+        }
+
+        if (!currentFingerprint) {
+            panel.hidden = true;
+            return;
+        }
+
+        panel.hidden = false;
+        const connection = findConnectionByFingerprint(currentFingerprint);
+        if (!connection) {
+            subtitle.textContent = "";
+            const empty = document.createElement("div");
+            empty.className = "saved-connections-card__empty";
+            empty.textContent = "No saved credentials are linked to this session yet.";
+            list.appendChild(empty);
+            return;
+        }
+
+        subtitle.textContent = "";
+        if (!Array.isArray(connection.bookmarks) || !connection.bookmarks.length) {
+            const empty = document.createElement("div");
+            empty.className = "saved-connections-card__empty";
+            empty.textContent = "No bookmarks saved for this connection yet.";
+            list.appendChild(empty);
+            return;
+        }
+
+        for (const bookmark of connection.bookmarks) {
+            const item = document.createElement("div");
+            item.className = "saved-connections-bookmarks__item";
+
+            const openButton = document.createElement("button");
+            openButton.type = "button";
+            openButton.className = "saved-connections-bookmarks__open";
+            openButton.innerHTML =
+                `<strong>${escapeHtml(bookmark.label || "Bookmark")}</strong>` +
+                `<div class="saved-connections-card__meta">${escapeHtml(bookmark.url || "/")} • Updated ${formatDate(bookmark.updatedAt)}</div>`;
+            openButton.addEventListener("click", () => openBookmarkInBackground(bookmark.url));
+
+            const label = openButton.querySelector("strong");
+            if (label) {
+                label.className = "saved-connections-bookmarks__label";
+                label.textContent = getBookmarkDisplayLabel(bookmark, connection);
+            }
+
+            const inlineMeta = openButton.querySelector(".saved-connections-card__meta");
+            if (inlineMeta) {
+                inlineMeta.remove();
+            }
+
+            const meta = document.createElement("div");
+            meta.className = "saved-connections-card__meta saved-connections-bookmarks__meta";
+            meta.textContent = `Updated ${formatDate(bookmark.updatedAt)}`;
+
+            const actions = document.createElement("div");
+            actions.className = "saved-connections-card__actions saved-connections-bookmarks__actions";
+
+            const forgetButton = document.createElement("button");
+            forgetButton.type = "button";
+            forgetButton.className = "saved-connections-bookmarks__forget";
+            forgetButton.textContent = "Forget";
+            forgetButton.addEventListener("click", async () => {
+                if (!window.confirm(`Forget bookmark "${bookmark.label}"?`)) {
+                    return;
+                }
+                try {
+                    await apiRequest("delete_bookmark", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            connectionId: connection.id,
+                            bookmarkId: bookmark.id,
+                        }),
+                    });
+                    showToast("Bookmark removed.");
+                    await refreshConnections();
+                } catch (error) {
+                    showToast(error.message);
+                }
+            });
+
+            actions.appendChild(forgetButton);
+            item.appendChild(openButton);
+            item.appendChild(meta);
+            item.appendChild(actions);
+            list.appendChild(item);
+        }
+    }
+
     function injectCurrentConnectionButton() {
         const authForm = getAuthForm();
         if (authForm) {
@@ -439,7 +677,7 @@ HTML;
                     showToast("Fill in server, username, and password first.");
                     return;
                 }
-                openSaveModal(connection, () => authForm.submit());
+                void saveConnectionAndLogin(connection, () => authForm.submit());
             };
             if (saveButton) {
                 saveButton.addEventListener("click", beginSaveAndLogin);
@@ -451,11 +689,10 @@ HTML;
         const launcher = document.createElement("button");
         launcher.type = "button";
         launcher.className = "saved-connections-launcher saved-connections-floating";
-        launcher.textContent = "Save current connection";
+        launcher.textContent = "Add bookmark";
         launcher.addEventListener("click", async () => {
             try {
-                const data = await apiRequest("current", { useCurrentContext: true });
-                openSaveModal(data.connection);
+                await saveCurrentPage();
             } catch (error) {
                 showToast(error.message);
             }
@@ -485,23 +722,40 @@ HTML;
         form.elements["auth[db]"].value = connection.db || "";
     }
 
-    function openSaveModal(connection, onSuccess) {
+    async function saveConnectionAndLogin(connection, onSuccess = null, initialBookmark = null) {
+        const fingerprint = await fingerprintConnection(connection);
+        const existingConnection = findConnectionByFingerprint(fingerprint);
+        if (existingConnection && !initialBookmark) {
+            if (typeof onSuccess === "function") {
+                onSuccess();
+            }
+            return;
+        }
+
         const suggestedLabel = [connection.server, connection.db, connection.username]
             .filter(Boolean)
             .join(" / ");
         openModal({
-            title: "Save encrypted connection",
-            description: "The container stores only encrypted connection data. Choose any 4-character PIN. The PIN is never stored.",
-            showLabelField: true,
-            defaultLabel: suggestedLabel,
+            title: initialBookmark ? "Save encrypted connection and bookmark" : "Save encrypted connection",
+            description: initialBookmark
+                ? "The container stores only encrypted connection data. Choose any 4-character PIN to save these credentials and this page bookmark together."
+                : "The container stores only encrypted connection data. Choose any 4-character PIN. The PIN is never stored.",
+            showLabelField: !existingConnection,
+            defaultLabel: existingConnection?.label || suggestedLabel,
             submit: async ({ label, pin }) => {
                 const payload = await encryptConnection(connection, pin);
+                const saveLabel = (label || existingConnection?.label || suggestedLabel).trim();
                 await apiRequest("save", {
                     method: "POST",
-                    body: JSON.stringify({ label, payload }),
+                    body: JSON.stringify({
+                        label: saveLabel,
+                        payload,
+                        fingerprint,
+                        bookmark: initialBookmark,
+                    }),
                 });
                 await refreshConnections();
-                showToast(`Saved "${label}".`);
+                showToast(initialBookmark ? `Saved "${saveLabel}" and bookmarked this page.` : `Saved "${saveLabel}".`);
                 if (typeof onSuccess === "function") {
                     onSuccess();
                 }
@@ -509,7 +763,7 @@ HTML;
         });
     }
 
-    function unlockAndLogin(record) {
+    async function unlockAndLogin(record) {
         const authForm = getAuthForm();
         if (!authForm) {
             showToast("Open a login page to use a saved connection.");
@@ -522,10 +776,151 @@ HTML;
             showLabelField: false,
             submit: async ({ pin }) => {
                 const decrypted = await decryptConnection(record.payload, pin);
+                const fingerprint = await fingerprintConnection(decrypted);
+                if (record.id && fingerprint && record.fingerprint !== fingerprint) {
+                    await apiRequest("link_connection", {
+                        method: "POST",
+                        body: JSON.stringify({ id: record.id, fingerprint }),
+                    });
+                }
                 writeAuthForm(authForm, decrypted);
                 authForm.submit();
             },
         });
+    }
+
+    async function ensureCurrentConnection() {
+        if (currentConnection || getAuthForm()) {
+            return currentConnection;
+        }
+
+        try {
+            const data = await apiRequest("current", { useCurrentContext: true });
+            currentConnection = data.connection || null;
+            currentFingerprint = currentConnection ? await fingerprintConnection(currentConnection) : "";
+            currentConnectionError = "";
+            return currentConnection;
+        } catch (error) {
+            currentConnectionError = error.message || "Unable to inspect the current connection.";
+            throw error;
+        }
+    }
+
+    async function saveCurrentPage() {
+        const connection = await ensureCurrentConnection();
+        if (!connection) {
+            throw new Error("No active connection is available to save.");
+        }
+
+        const bookmark = getCurrentBookmark(connection);
+        const fingerprint = currentFingerprint || await fingerprintConnection(connection);
+        const existingConnection = findConnectionByFingerprint(fingerprint);
+
+        if (!existingConnection) {
+            await saveConnectionAndLogin(connection, null, bookmark);
+            return;
+        }
+
+        await apiRequest("save_bookmark", {
+            method: "POST",
+            body: JSON.stringify({ fingerprint, bookmark }),
+        });
+        await refreshConnections();
+        showToast(`Bookmarked "${bookmark.label}".`);
+    }
+
+    function getCurrentBookmark(connection) {
+        const relativeUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        const headingText =
+            document.querySelector("#breadcrumb")?.textContent?.replace(/\s+/g, " ").trim() ||
+            document.querySelector("h2")?.textContent?.trim() ||
+            "";
+        const titleText = cleanBookmarkLabel(document.title);
+        const label = getBookmarkUrlSuffix(relativeUrl, connection) || headingText || titleText || relativeUrl;
+
+        return {
+            label: label.slice(0, 120),
+            url: relativeUrl,
+        };
+    }
+
+    function getBookmarkDisplayLabel(bookmark, connection) {
+        return getBookmarkUrlSuffix(bookmark.url || "", connection) ||
+            cleanBookmarkLabel(bookmark.label || "") ||
+            cleanBookmarkLabel(bookmark.url || "") ||
+            "Bookmark";
+    }
+
+    function getBookmarkUrlSuffix(url, connection) {
+        if (!url) {
+            return "";
+        }
+
+        const decodedUrl = decodeURIComponent(String(url).replace(/\+/g, "%20"));
+        const namespaceMatch = decodedUrl.match(/ns=public(?:&(.*))?$/i);
+        if (namespaceMatch) {
+            return (namespaceMatch[1] || "").trim();
+        }
+
+        const parsed = new URL(url, window.location.origin);
+        const params = new URLSearchParams(parsed.search);
+        const driverKey = connection?.driver || "";
+        if (driverKey && connection?.server && params.get(driverKey) === connection.server) {
+            params.delete(driverKey);
+        }
+        if (params.get("username") === (connection?.username || "")) {
+            params.delete("username");
+        }
+        if (params.get("db") === (connection?.db || "")) {
+            params.delete("db");
+        }
+        params.delete("ns");
+
+        const suffix = [];
+        const search = decodeURIComponent(params.toString().replace(/\+/g, "%20"));
+        if (parsed.pathname && parsed.pathname !== "/") {
+            suffix.push(parsed.pathname.replace(/^\/+/, ""));
+        }
+        if (search) {
+            suffix.push(search);
+        }
+        if (parsed.hash) {
+            suffix.push(parsed.hash.slice(1));
+        }
+
+        return suffix.join(" ").trim();
+    }
+
+    function cleanBookmarkLabel(value) {
+        return String(value || "")
+            .replace(/\bAdminer\s*\d[\d.]*\b/gi, "")
+            .replace(/\s*-\s*Adminer\s*$/i, "")
+            .replace(/\s+Adminer\s*$/i, "")
+            .replace(/\s+/g, " ")
+            .trim();
+    }
+
+    function findConnectionByFingerprint(fingerprint) {
+        if (!fingerprint) {
+            return null;
+        }
+        return cachedConnections.find(connection => connection.fingerprint === fingerprint) || null;
+    }
+
+    function openBookmarkInBackground(url) {
+        if (!url) {
+            return;
+        }
+
+        const anchor = document.createElement("a");
+        anchor.href = new URL(url, window.location.origin).toString();
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        anchor.style.display = "none";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        window.focus();
     }
 
     function openModal(options) {
@@ -811,6 +1206,17 @@ HTML;
         );
     }
 
+    async function fingerprintConnection(connection) {
+        const normalized = JSON.stringify({
+            driver: connection?.driver || "",
+            server: connection?.server || "",
+            username: connection?.username || "",
+            db: connection?.db || "",
+        });
+        const digest = await crypto.subtle.digest("SHA-256", encoder.encode(normalized));
+        return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+    }
+
     function bytesToBase64(bytes) {
         let binary = "";
         bytes.forEach(byte => {
@@ -837,6 +1243,11 @@ HTML;
             return "recently";
         }
         return date.toLocaleString();
+    }
+
+    function formatCount(value, singular) {
+        const count = Number(value) || 0;
+        return `${count} ${singular}${count === 1 ? "" : "s"}`;
     }
 
     function escapeHtml(value) {
@@ -990,11 +1401,19 @@ HTML;
             }
         }
 
+        $fingerprint = $this->normalizeFingerprint((string) ($request['fingerprint'] ?? ''));
+        if ($fingerprint === '') {
+            throw new RuntimeException('Connection fingerprint is required.', 422);
+        }
+
         $store = $this->loadStore();
         $now = gmdate(DATE_ATOM);
         $existingIndex = null;
         foreach ($store['connections'] as $index => $connection) {
-            if (strcasecmp((string) $connection['label'], $label) === 0) {
+            if (
+                (string) ($connection['fingerprint'] ?? '') === $fingerprint ||
+                strcasecmp((string) $connection['label'], $label) === 0
+            ) {
                 $existingIndex = $index;
                 break;
             }
@@ -1003,10 +1422,19 @@ HTML;
         $record = array(
             'id' => $existingIndex === null ? bin2hex(random_bytes(12)) : $store['connections'][$existingIndex]['id'],
             'label' => $label,
+            'fingerprint' => $fingerprint,
             'payload' => $payload,
+            'bookmarks' => $existingIndex === null
+                ? array()
+                : $this->normalizeBookmarks($store['connections'][$existingIndex]['bookmarks'] ?? array()),
             'createdAt' => $existingIndex === null ? $now : $store['connections'][$existingIndex]['createdAt'],
             'updatedAt' => $now,
         );
+
+        $bookmark = $request['bookmark'] ?? null;
+        if (is_array($bookmark)) {
+            $record['bookmarks'] = $this->upsertBookmark($record['bookmarks'], $bookmark, $now);
+        }
 
         if ($existingIndex === null) {
             $store['connections'][] = $record;
@@ -1018,6 +1446,38 @@ HTML;
             return strcasecmp((string) $left['label'], (string) $right['label']);
         });
 
+        $this->writeStore($store);
+
+        return $record;
+    }
+
+    private function saveBookmark(array $request): array
+    {
+        $fingerprint = $this->normalizeFingerprint((string) ($request['fingerprint'] ?? ''));
+        if ($fingerprint === '') {
+            throw new RuntimeException('Connection fingerprint is required.', 422);
+        }
+
+        $bookmark = $request['bookmark'] ?? null;
+        if (!is_array($bookmark)) {
+            throw new RuntimeException('Bookmark data is required.', 422);
+        }
+
+        $store = $this->loadStore();
+        $index = $this->findConnectionIndexByFingerprint($store['connections'], $fingerprint);
+        if ($index === null) {
+            throw new RuntimeException('Save this connection before bookmarking pages.', 409);
+        }
+
+        $now = gmdate(DATE_ATOM);
+        $record = $store['connections'][$index];
+        $record['bookmarks'] = $this->upsertBookmark(
+            $this->normalizeBookmarks($record['bookmarks'] ?? array()),
+            $bookmark,
+            $now
+        );
+        $record['updatedAt'] = $now;
+        $store['connections'][$index] = $record;
         $this->writeStore($store);
 
         return $record;
@@ -1038,10 +1498,63 @@ HTML;
         $this->writeStore($store);
     }
 
+    private function deleteBookmark(array $request): array
+    {
+        $connectionId = trim((string) ($request['connectionId'] ?? ''));
+        $bookmarkId = trim((string) ($request['bookmarkId'] ?? ''));
+
+        if ($connectionId === '' || $bookmarkId === '') {
+            throw new RuntimeException('Connection and bookmark ids are required.', 422);
+        }
+
+        $store = $this->loadStore();
+        $connectionIndex = $this->findConnectionIndexById($store['connections'], $connectionId);
+        if ($connectionIndex === null) {
+            throw new RuntimeException('Saved connection not found.', 404);
+        }
+
+        $record = $store['connections'][$connectionIndex];
+        $record['bookmarks'] = array_values(array_filter(
+            $this->normalizeBookmarks($record['bookmarks'] ?? array()),
+            static fn (array $bookmark): bool => (string) ($bookmark['id'] ?? '') !== $bookmarkId
+        ));
+        $record['updatedAt'] = gmdate(DATE_ATOM);
+        $store['connections'][$connectionIndex] = $record;
+        $this->writeStore($store);
+
+        return $record;
+    }
+
+    private function linkConnection(array $request): array
+    {
+        $id = trim((string) ($request['id'] ?? ''));
+        $fingerprint = $this->normalizeFingerprint((string) ($request['fingerprint'] ?? ''));
+
+        if ($id === '' || $fingerprint === '') {
+            throw new RuntimeException('Connection id and fingerprint are required.', 422);
+        }
+
+        $store = $this->loadStore();
+        $index = $this->findConnectionIndexById($store['connections'], $id);
+        if ($index === null) {
+            throw new RuntimeException('Saved connection not found.', 404);
+        }
+
+        $record = $store['connections'][$index];
+        $record['fingerprint'] = $fingerprint;
+        $store['connections'][$index] = $record;
+        $this->writeStore($store);
+
+        return $record;
+    }
+
     private function getCurrentConnection(): array
     {
+        $username = $this->getCurrentUsername();
         $password = Adminer\get_password();
-        $username = (string) ($_GET['username'] ?? '');
+        if ((!is_string($password) || $password === '') && $username !== '') {
+            $password = $this->getStoredPassword($username);
+        }
 
         if (!is_string($password) || $password === '' || $username === '') {
             throw new RuntimeException('No active connection is available to save.', 409);
@@ -1056,27 +1569,105 @@ HTML;
         );
     }
 
+    private function getCurrentUsername(): string
+    {
+        $username = trim((string) ($_GET['username'] ?? ''));
+        if ($username !== '') {
+            return $username;
+        }
+
+        if (!defined('Adminer\\DRIVER') || !defined('Adminer\\SERVER')) {
+            return '';
+        }
+
+        $driver = (string) constant('Adminer\\DRIVER');
+        $server = (string) constant('Adminer\\SERVER');
+        $usernames = $_SESSION['pwds'][$driver][$server] ?? null;
+        if (!is_array($usernames)) {
+            return '';
+        }
+
+        $candidates = array_keys($usernames);
+        return count($candidates) === 1 ? (string) $candidates[0] : '';
+    }
+
+    private function getStoredPassword(string $username): ?string
+    {
+        if (!defined('Adminer\\DRIVER') || !defined('Adminer\\SERVER')) {
+            return null;
+        }
+
+        $driver = (string) constant('Adminer\\DRIVER');
+        $server = (string) constant('Adminer\\SERVER');
+        $storedPassword = $_SESSION['pwds'][$driver][$server][$username] ?? null;
+
+        if (is_string($storedPassword)) {
+            return $storedPassword;
+        }
+
+        if (
+            is_array($storedPassword) &&
+            isset($storedPassword[0]) &&
+            is_string($storedPassword[0]) &&
+            !empty($_COOKIE['adminer_key'])
+        ) {
+            $decrypted = Adminer\decrypt_string($storedPassword[0], (string) $_COOKIE['adminer_key']);
+            return is_string($decrypted) ? $decrypted : null;
+        }
+
+        return null;
+    }
+
     private function loadStore(): array
     {
         $this->ensureStorageDirectory();
 
         if (!is_file($this->storageFile)) {
-            return array('version' => 1, 'connections' => array());
+            return array('version' => 2, 'connections' => array());
         }
 
         $json = file_get_contents($this->storageFile);
         $decoded = json_decode($json ?: '', true);
 
         if (!is_array($decoded) || !isset($decoded['connections']) || !is_array($decoded['connections'])) {
-            return array('version' => 1, 'connections' => array());
+            return array('version' => 2, 'connections' => array());
         }
 
-        return $decoded;
+        $connections = array();
+        foreach ($decoded['connections'] as $connection) {
+            if (!is_array($connection)) {
+                continue;
+            }
+
+            $id = trim((string) ($connection['id'] ?? ''));
+            $label = trim((string) ($connection['label'] ?? ''));
+            $payload = $connection['payload'] ?? null;
+            if ($id === '' || $label === '' || !is_array($payload)) {
+                continue;
+            }
+
+            $connections[] = array(
+                'id' => $id,
+                'label' => $label,
+                'fingerprint' => $this->normalizeFingerprint((string) ($connection['fingerprint'] ?? '')),
+                'payload' => $payload,
+                'bookmarks' => $this->normalizeBookmarks($connection['bookmarks'] ?? array()),
+                'createdAt' => (string) ($connection['createdAt'] ?? ''),
+                'updatedAt' => (string) ($connection['updatedAt'] ?? ''),
+            );
+        }
+
+        usort($connections, static function (array $left, array $right): int {
+            return strcasecmp((string) $left['label'], (string) $right['label']);
+        });
+
+        return array('version' => 2, 'connections' => $connections);
     }
 
     private function writeStore(array $store): void
     {
         $this->ensureStorageDirectory();
+        $store['version'] = 2;
 
         $encoded = json_encode($store, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($encoded === false) {
@@ -1099,6 +1690,139 @@ HTML;
         if (!is_dir($directory) && !mkdir($directory, 0775, true) && !is_dir($directory)) {
             throw new RuntimeException('Unable to initialize connection storage.', 500);
         }
+    }
+
+    private function normalizeFingerprint(string $fingerprint): string
+    {
+        $fingerprint = strtolower(trim($fingerprint));
+        return preg_match('/^[a-f0-9]{64}$/', $fingerprint) === 1 ? $fingerprint : '';
+    }
+
+    private function normalizeBookmarks($bookmarks): array
+    {
+        if (!is_array($bookmarks)) {
+            return array();
+        }
+
+        $normalized = array();
+        foreach ($bookmarks as $bookmark) {
+            if (!is_array($bookmark)) {
+                continue;
+            }
+
+            $id = trim((string) ($bookmark['id'] ?? ''));
+            $label = trim((string) ($bookmark['label'] ?? ''));
+            $url = $this->normalizeBookmarkUrl((string) ($bookmark['url'] ?? ''), false);
+            if ($id === '' || $label === '' || $url === null) {
+                continue;
+            }
+
+            $normalized[] = array(
+                'id' => $id,
+                'label' => $label,
+                'url' => $url,
+                'createdAt' => (string) ($bookmark['createdAt'] ?? ''),
+                'updatedAt' => (string) ($bookmark['updatedAt'] ?? ''),
+            );
+        }
+
+        usort($normalized, static function (array $left, array $right): int {
+            return strcasecmp((string) $left['label'], (string) $right['label']);
+        });
+
+        return $normalized;
+    }
+
+    private function upsertBookmark(array $bookmarks, array $bookmark, string $now): array
+    {
+        $label = trim((string) ($bookmark['label'] ?? ''));
+        if ($label === '') {
+            throw new RuntimeException('Bookmark name is required.', 422);
+        }
+
+        if (strlen($label) > 120) {
+            $label = substr($label, 0, 120);
+        }
+
+        $url = $this->normalizeBookmarkUrl((string) ($bookmark['url'] ?? ''));
+
+        $existingIndex = null;
+        foreach ($bookmarks as $index => $existingBookmark) {
+            if ((string) ($existingBookmark['url'] ?? '') === $url) {
+                $existingIndex = $index;
+                break;
+            }
+        }
+
+        $record = array(
+            'id' => $existingIndex === null ? bin2hex(random_bytes(12)) : $bookmarks[$existingIndex]['id'],
+            'label' => $label,
+            'url' => $url,
+            'createdAt' => $existingIndex === null ? $now : $bookmarks[$existingIndex]['createdAt'],
+            'updatedAt' => $now,
+        );
+
+        if ($existingIndex === null) {
+            $bookmarks[] = $record;
+        } else {
+            $bookmarks[$existingIndex] = $record;
+        }
+
+        usort($bookmarks, static function (array $left, array $right): int {
+            return strcasecmp((string) $left['label'], (string) $right['label']);
+        });
+
+        return array_values($bookmarks);
+    }
+
+    private function normalizeBookmarkUrl(string $url, bool $throwOnInvalid = true): ?string
+    {
+        $url = trim($url);
+        $isValid = (
+            $url !== '' &&
+            !preg_match('~^[a-z][a-z0-9+.-]*:~i', $url) &&
+            !str_starts_with($url, '//') &&
+            (str_starts_with($url, '/') || str_starts_with($url, '?'))
+        );
+
+        if (!$isValid) {
+            if ($throwOnInvalid) {
+                throw new RuntimeException('Bookmark URL must stay within Adminer.', 422);
+            }
+            return null;
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false || isset($parts['scheme']) || isset($parts['host']) || isset($parts['user']) || isset($parts['pass'])) {
+            if ($throwOnInvalid) {
+                throw new RuntimeException('Bookmark URL must stay within Adminer.', 422);
+            }
+            return null;
+        }
+
+        return $url;
+    }
+
+    private function findConnectionIndexByFingerprint(array $connections, string $fingerprint): ?int
+    {
+        foreach ($connections as $index => $connection) {
+            if ((string) ($connection['fingerprint'] ?? '') === $fingerprint) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    private function findConnectionIndexById(array $connections, string $id): ?int
+    {
+        foreach ($connections as $index => $connection) {
+            if ((string) ($connection['id'] ?? '') === $id) {
+                return $index;
+            }
+        }
+
+        return null;
     }
 }
 
