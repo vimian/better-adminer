@@ -61,45 +61,34 @@ class SavedConnectionsPlugin extends Adminer\Plugin
         echo <<<'HTML'
 <style>
 .saved-connections-card {
-    border: 1px solid #c7d2df;
-    border-radius: 10px;
-    padding: 12px;
-    margin: 0 0 10px;
-    background: linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+    margin: 0;
+    font: 90% / 1.25 Verdana, Arial, Helvetica, sans-serif;
 }
-.saved-connections-card__title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 6px;
+.saved-connections-card[hidden] {
+    display: none;
 }
-.saved-connections-card__title strong {
-    font-size: 13px;
-}
-.saved-connections-card__hint,
 .saved-connections-card__empty,
 .saved-connections-card__meta,
-.saved-connections-inline-hint,
 .saved-connections-modal__hint {
-    color: #5a6775;
+    color: #777;
     font-size: 12px;
     line-height: 1.4;
 }
 .saved-connections-card__list {
-    display: grid;
-    gap: 8px;
-    margin-top: 10px;
+    margin: 0;
 }
-.saved-connections-card__item {
+.saved-connections-card__item,
+.saved-connections-card__empty {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 10px;
-    padding: 10px;
-    border: 1px solid #d8e0ea;
-    border-radius: 8px;
-    background: #fff;
+    gap: 8px;
+    padding: .8em 1em;
+    border-bottom: 1px solid #ccc;
+    background: var(--bg);
+}
+.saved-connections-card__empty {
+    display: block;
 }
 .saved-connections-card__open {
     display: block;
@@ -107,31 +96,29 @@ class SavedConnectionsPlugin extends Adminer\Plugin
     text-align: left;
     padding: 0;
     border: 0;
-    background: transparent;
-    color: inherit;
+    background: none;
+    color: var(--fg);
     cursor: pointer;
+    font: inherit;
+}
+.saved-connections-card__open:hover,
+.saved-connections-card__forget:hover {
+    opacity: .7;
 }
 .saved-connections-card__actions {
     display: flex;
-    gap: 8px;
     align-items: center;
 }
-.saved-connections-card__forget,
-.saved-connections-launcher {
-    border-radius: 8px;
-    border: 1px solid #93a8bf;
-    background: #f2f6fb;
-    color: #17324d;
+.saved-connections-card__forget {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--fg);
     cursor: pointer;
-    padding: 8px 12px;
     font: inherit;
 }
 .saved-connections-launcher {
-    margin-right: 8px;
-}
-.saved-connections-launcher:hover,
-.saved-connections-card__forget:hover {
-    background: #e5eef8;
+    font: 90% / 1.25 Verdana, Arial, Helvetica, sans-serif;
 }
 .saved-connections-floating {
     position: fixed;
@@ -143,7 +130,7 @@ class SavedConnectionsPlugin extends Adminer\Plugin
 .saved-connections-modal {
     position: fixed;
     inset: 0;
-    background: rgba(10, 20, 30, 0.55);
+    background: rgba(0, 0, 0, 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -154,73 +141,86 @@ class SavedConnectionsPlugin extends Adminer\Plugin
     display: none;
 }
 .saved-connections-modal__dialog {
-    width: min(420px, 100%);
-    border-radius: 14px;
-    background: #fff;
-    padding: 20px;
-    box-shadow: 0 18px 60px rgba(10, 20, 30, 0.25);
+    width: min(28em, 100%);
+    border: 1px solid #999;
+    background: var(--bg);
+    color: var(--fg);
+    padding: 0 1em 1em;
+    box-shadow: 0 0 20px -3px var(--fg);
+    font: 90% / 1.25 Verdana, Arial, Helvetica, sans-serif;
 }
 .saved-connections-modal__title {
-    margin: 0 0 6px;
-    font-size: 18px;
+    margin: 0 -0.667em .8em;
+    padding: .8em .667em;
+    border-bottom: 1px solid #999;
+    font-size: 150%;
+    font-weight: normal;
+    color: #777;
+    background: var(--dim);
 }
 .saved-connections-modal__description {
-    margin: 0 0 16px;
-    color: #334155;
-    font-size: 13px;
-    line-height: 1.5;
+    margin: 0 0 .8em;
+    color: var(--fg);
+    font-size: 100%;
+    line-height: 1.25;
 }
 .saved-connections-modal__field {
-    display: grid;
-    gap: 6px;
-    margin-bottom: 12px;
+    margin-bottom: .8em;
 }
 .saved-connections-modal__field label {
-    font-weight: 600;
+    display: block;
+    margin-bottom: .2em;
+    font-weight: normal;
 }
 .saved-connections-modal__field input {
     width: 100%;
     box-sizing: border-box;
+    font: inherit;
 }
 .saved-connections-modal__pin {
     display: flex;
-    gap: 10px;
+    gap: .5em;
 }
 .saved-connections-modal__pin-slot {
-    width: 52px;
-    height: 52px;
-    border: 1px solid #93a8bf;
-    border-radius: 10px;
+    width: 3em;
+    height: auto;
+    border: 1px solid #999;
+    border-radius: 0;
+    background: var(--bg);
+    color: var(--fg);
     text-align: center;
-    font-size: 24px;
-    line-height: 1;
-    padding: 0;
+    line-height: 1.25;
+    padding: .2em .3em;
 }
 .saved-connections-modal__pin-slot:focus {
-    outline: 2px solid #17324d;
+    outline: 2px solid var(--fg);
     outline-offset: 2px;
 }
 .saved-connections-modal__actions {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 12px;
+    margin-top: .8em;
+    text-align: right;
 }
 .saved-connections-modal__submit {
-    border-radius: 8px;
-    border: 1px solid #17324d;
-    background: #17324d;
-    color: #fff;
+    border: 1px solid #999;
+    background: var(--dim);
+    color: var(--fg);
     cursor: pointer;
-    padding: 8px 14px;
+    padding: .2em .6em;
     font: inherit;
 }
 .saved-connections-modal__submit:hover {
-    background: #0f2740;
+    background: var(--lit);
 }
 .saved-connections-modal__error {
-    min-height: 20px;
-    color: #b42318;
-    font-size: 12px;
+    color: red;
+    background: #fee;
+    font-size: 100%;
+    line-height: 1.25;
+    padding: .5em .8em;
+    margin: .8em 0 0;
+}
+.saved-connections-modal__error:empty {
+    display: none;
 }
 .saved-connections-toast {
     position: fixed;
@@ -248,7 +248,7 @@ class SavedConnectionsPlugin extends Adminer\Plugin
         bottom: 16px;
     }
     .saved-connections-modal__pin-slot {
-        width: calc((100% - 30px) / 4);
+        width: calc((100% - 1.5em) / 4);
     }
 }
 </style>
@@ -297,8 +297,11 @@ HTML;
     let modalState = null;
 
     document.addEventListener("DOMContentLoaded", () => {
+        injectSavedConnectionsPanel();
         injectCurrentConnectionButton();
-        void refreshConnections();
+        if (getAuthForm()) {
+            void refreshConnections();
+        }
     });
 
     function endpointUrl(action, useCurrentContext = false) {
@@ -339,15 +342,36 @@ HTML;
         }
     }
 
+    function injectSavedConnectionsPanel() {
+        if (!getAuthForm() || document.querySelector("[data-saved-connections-panel]")) {
+            return;
+        }
+
+        const menu = document.querySelector("#menu");
+        const heading = menu?.querySelector("h1");
+        if (!menu || !heading) {
+            return;
+        }
+
+        const panel = document.createElement("div");
+        panel.className = "saved-connections-card";
+        panel.hidden = true;
+        panel.dataset.savedConnectionsPanel = "1";
+        panel.innerHTML = '<div class="saved-connections-card__list" data-saved-connections-list></div>';
+        heading.insertAdjacentElement("afterend", panel);
+    }
+
     function renderSavedConnections(errorMessage = "") {
+        const panel = document.querySelector("[data-saved-connections-panel]");
         const list = document.querySelector("[data-saved-connections-list]");
-        if (!list) {
+        if (!panel || !list) {
             return;
         }
 
         list.textContent = "";
 
         if (errorMessage) {
+            panel.hidden = false;
             const error = document.createElement("div");
             error.className = "saved-connections-card__empty";
             error.textContent = errorMessage;
@@ -356,12 +380,11 @@ HTML;
         }
 
         if (!cachedConnections.length) {
-            const empty = document.createElement("div");
-            empty.className = "saved-connections-card__empty";
-            empty.textContent = "No saved connections yet. Use Save + Login the first time you connect.";
-            list.appendChild(empty);
+            panel.hidden = true;
             return;
         }
+
+        panel.hidden = false;
 
         for (const connection of cachedConnections) {
             const item = document.createElement("div");
@@ -851,13 +874,7 @@ JS
 
     public function loginFormField($name, $heading, $input)
     {
-        $row = $heading.$input."\n";
-
-        if ($name === 'driver') {
-            return $this->savedConnectionsPanel().$row;
-        }
-
-        return $row;
+        return $heading.$input."\n";
     }
 
     public function loginForm()
@@ -899,30 +916,11 @@ JS
         return true;
     }
 
-    private function savedConnectionsPanel(): string
-    {
-        return <<<'HTML'
-<tr>
-    <td colspan="2">
-        <div class="saved-connections-card">
-            <div class="saved-connections-card__title">
-                <strong>Saved connections</strong>
-            </div>
-            <div class="saved-connections-card__list" data-saved-connections-list>
-                <div class="saved-connections-card__empty">Loading saved connections...</div>
-            </div>
-        </div>
-    </td>
-</tr>
-HTML;
-    }
-
     private function saveAndLoginRow(): string
     {
         return <<<'HTML'
 <p>
-    <button type="submit" class="saved-connections-launcher" data-saved-connections-save>Save + Login</button>
-    <span class="saved-connections-inline-hint">Saves this connection encrypted, then signs in with the same details.</span>
+    <input type="submit" value="Login" class="saved-connections-launcher" data-saved-connections-save>
 </p>
 HTML;
     }
