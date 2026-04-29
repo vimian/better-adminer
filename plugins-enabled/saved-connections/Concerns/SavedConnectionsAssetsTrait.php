@@ -41,6 +41,10 @@ trait SavedConnectionsAssetsTrait
             echo Adminer\script($this->assetContents($asset));
         }
 
+        if (method_exists($this, 'schemaGraphHead')) {
+            $this->schemaGraphHead();
+        }
+
         return true;
     }
 }

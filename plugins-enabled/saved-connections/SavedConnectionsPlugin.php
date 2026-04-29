@@ -7,6 +7,8 @@ class SavedConnectionsPlugin extends Adminer\Plugin
     use SavedConnectionsAuthFormTrait;
     use SavedConnectionsConnectionStoreTrait;
     use SavedConnectionsCurrentConnectionTrait;
+    use SavedConnectionsForeignKeyReferencesTrait;
+    use SavedConnectionsSchemaGraphTrait;
     use SavedConnectionsStorageTrait;
     use SavedConnectionsBookmarkStoreTrait;
 
