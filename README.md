@@ -57,6 +57,11 @@ Run:
 docker compose up --build
 ```
 
+Or double-click the launcher for your operating system:
+
+- Windows: `start-adminer.bat`
+- macOS: `start-adminer.command`
+
 Then open [http://localhost:8080](http://localhost:8080).
 
 ## Important networking note
